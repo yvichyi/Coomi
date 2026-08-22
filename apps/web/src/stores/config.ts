@@ -615,7 +615,7 @@ export const useConfigStore = defineStore('config', () => {
   return {
     permissionMode, planMode, themeMode, reasoningEffort, maxToolRounds, voiceBroadcast, sttEnabled, speechRate, connectionSettings, globalMemory, digitalLifeEnabled, customPrompt, providers, activeId, loading, usingMock, lastError, subAgentSettings,
     currentProviderId, currentModel, currentProvider, mergedProviders,
-    fetchProviders, selectModel, validateAndSelectModel, setPermissionMode, setThemeMode, setReasoningEffort, setMaxToolRounds, setVoiceBroadcast, fetchConnectionSettings, saveConnectionSettings, cyclePermissionMode, togglePlanMode,
+    fetchProviders, selectModel, validateAndSelectModel, setPermissionMode, setThemeMode, setReasoningEffort, setMaxToolRounds, setVoiceBroadcast, setSttEnabled, fetchConnectionSettings, saveConnectionSettings, cyclePermissionMode, togglePlanMode,
     toggleGlobalMemory, syncGlobalMemoryFromEngine, setDigitalLifeEnabled, syncDigitalLifeEnabled, fetchCustomPrompt, saveCustomPrompt,
     upsertProvider, deleteProvider, activateProvider, copyProvider, revealProviderKey, discoverModels, fetchSubAgentSettings, saveSubAgentSettings,
   }

@@ -21,7 +21,7 @@ async function refresh() {
     const list = data?.sessions ?? []
     sessions.value = list.map(s => ({
       title: s.title,
-      date: new Date(s.updated_at).toLocaleDateString('zh-CN'),
+      date: s.updated_at,
       total: s.usage?.total_tokens ?? 0,
       turns: s.turns ?? 0,
     })).slice(0, 30)
