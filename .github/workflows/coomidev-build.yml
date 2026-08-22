@@ -61,12 +61,12 @@ jobs:
 
       - name: Build CoomiDev APK
         run: |
+          chmod +x gradlew
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
           export COOMI_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.0.12077973"
           export COOMI_DEV_BUILD=1
           ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: Verify package identity
         run: |
