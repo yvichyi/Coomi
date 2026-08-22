@@ -172,6 +172,9 @@ public class CoomiActivity extends Activity {
         }
         applyThemeToWebView();
         CoomiTheme.applySystemBars(this);
+        if (mTts == null) {
+            mTts = new app.coomi.CoomiTTS(this);
+        }
     }
 
     /**
@@ -934,14 +937,6 @@ public class CoomiActivity extends Activity {
 
     private void evaluateJavascript(String script) {
         if (mWebView != null) mWebView.evaluateJavascript(script, null);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (mTts == null) {
-            mTts = new app.coomi.CoomiTTS(this);
-        }
     }
 
     @Override

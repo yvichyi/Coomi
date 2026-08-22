@@ -3,7 +3,6 @@ package app.coomi;
 import android.content.Context;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
-import android.speech.tts.Voice;
 import android.os.Bundle;
 import android.os.Build;
 
@@ -11,7 +10,6 @@ import com.termux.shared.logger.Logger;
 
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Set;
 
 /**
  * Thin wrapper around Android TextToSpeech for Coomi voice broadcast.
