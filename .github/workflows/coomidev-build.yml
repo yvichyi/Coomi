@@ -33,10 +33,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Set up Rust + Android target
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust 1.95.0 + Android target
+        uses: dtolnay/rust-toolchain@1.95.0
         with:
           targets: aarch64-linux-android
+          components: clippy,rustfmt
 
       - name: Install Android SDK packages
         run: |
