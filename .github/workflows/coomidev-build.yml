@@ -1,0 +1,82 @@
+name: CoomiDev APK build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - 'codex/**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-coomidev:
+    name: Build CoomiDev APK (linux-x86_64 → arm64-v8a)
+    runs-on: ubuntu-24.04
+    env:
+      COOMI_DEV_BUILD: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install Android SDK command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools,platforms;android-36,platforms;android-28"
+
+      - name: Prepare NDK
+        run: |
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.0.12077973" --channel=0 >/dev/null
+          echo "NDK installed"
+
+      - name: Resolve signing secrets
+        run: |
+          STORE_PW="${COOMI_SIGNING_STORE_PASSWORD:-android}"
+          KEY_PW="${COOMI_SIGNING_KEY_PASSWORD:-android}"
+          printf 'coomi.signing.storePassword=%s\ncoomi.signing.keyPassword=%s\n' "$STORE_PW" "$KEY_PW" > local.properties
+          echo "local.properties written (contents not printed)"
+        env:
+          COOMI_SIGNING_STORE_PASSWORD: ${{ secrets.COOMI_SIGNING_STORE_PASSWORD }}
+          COOMI_SIGNING_KEY_PASSWORD: ${{ secrets.COOMI_SIGNING_KEY_PASSWORD }}
+
+      - name: Build CoomiDev APK
+        run: |
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export COOMI_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.0.12077973"
+          export COOMI_DEV_BUILD=1
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+
+      - name: Verify package identity
+        run: |
+          APK=$(find apps/coomi-app/app/build/outputs/apk -type f -name 'CoomiDev-*.apk' | sort | tail -n 1)
+          echo "APK=$APK"
+          test -n "$APK" && test -s "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/$(ls "$ANDROID_SDK_ROOT/build-tools" | sort -V | tail -n1)/aapt2" dump badging "$APK" | grep -E "package: name='com\.coomidev\.android'"
+
+      - name: Upload CoomiDev APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoomiDev-APK
+          path: apps/coomi-app/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
