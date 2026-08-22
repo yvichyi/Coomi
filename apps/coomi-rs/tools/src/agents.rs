@@ -79,7 +79,7 @@ impl AgentScheduler {
             policy,
             system_prompt,
             persistent_memory: true,
-            max_agents: 3,
+            max_agents: 5,  // parallel sub-agent cap (custom fork: 3 -> 5)
             agents: Mutex::new(BTreeMap::new()),
         })
     }
