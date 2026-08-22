@@ -64,9 +64,13 @@ jobs:
         run: |
           chmod +x gradlew
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
           export COOMI_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.0.12077973"
           export COOMI_DEV_BUILD=1
+          export COOMI_NPM="$(command -v npm)"
+          export COOMI_CARGO="$(command -v cargo)"
+          export COOMI_RUSTUP="$(command -v rustup)"
+          echo "NPM=$(command -v npm) CARGO=$(command -v cargo) RUSTUP=$(command -v rustup)"
+          test -n "$COOMI_NPM" && test -n "$COOMI_CARGO" && test -n "$COOMI_RUSTUP"
           ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
 
       - name: Verify package identity
