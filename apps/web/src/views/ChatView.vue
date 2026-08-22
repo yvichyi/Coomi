@@ -218,13 +218,13 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
       <TopBar @menu="openDrawer">
         <template #extra>
           <button class="icon-btn focus-btn" :class="{ on: focusMode }" aria-label="专注模式" @click="toggleFocusMode">
-            <CoomiIcon name="maximize" :size="17}" />
+            <CoomiIcon name="maximize" :size="17" />
           </button>
           <button class="icon-btn" aria-label="气泡样式" @click="setBubbleStyle(bubbleStyle === 'bubble' ? 'flat' : bubbleStyle === 'flat' ? 'tail' : 'bubble')">
-            <CoomiIcon name="message" :size="17}" />
+            <CoomiIcon name="message" :size="17" />
           </button>
           <button class="icon-btn" :class="{ on: bgMode !== 'none' }" aria-label="动态背景" @click="cycleBgMode">
-            <CoomiIcon name="sparkle" :size="17}" />
+            <CoomiIcon name="sparkle" :size="17" />
           </button>
         </template>
       </TopBar>
