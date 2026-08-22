@@ -41,8 +41,12 @@ jobs:
       - name: Install Android SDK packages
         run: |
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "platforms;android-36" "platforms;android-28" "build-tools;35.0.0" "ndk;27.0.12077973" --channel=0
+          SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort | tail -n1)"
+          echo "SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "SDKMANAGER=$SDKMANAGER"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-36" "platforms;android-28" "build-tools;35.0.0" "ndk;27.0.12077973" --channel=0
           echo "SDK packages installed"
 
       - name: Resolve signing secrets
