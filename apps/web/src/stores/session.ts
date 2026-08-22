@@ -98,6 +98,7 @@ export const useSessionStore = defineStore('session', () => {
   /** 换 sessionId 后必须重连：WS 的路径里带着 session id。 */
   function connect(wsUrl?: string) {
     if (transport.value && connectedSessionId === sessionId.value) return
+    window.addEventListener('coomi:share-received', onShareReceived)
     const targetSessionId = sessionId.value
     const previous = transport.value
     transport.value = null
@@ -139,7 +140,16 @@ export const useSessionStore = defineStore('session', () => {
     t.connect()
   }
 
-  function disconnect() { transport.value?.close(); transport.value = null; connectedSessionId = '' }
+  function disconnect() {
+    transport.value?.close(); transport.value = null; connectedSessionId = ''
+    window.removeEventListener('coomi:share-received', onShareReceived)
+  }
+
+  function onShareReceived(event: Event) {
+    const text = (event as CustomEvent).detail
+    if (!text) return
+    sendMessage(text)
+  }
 
   /** Recreate the active socket so newly saved retry settings take effect immediately. */
   function reconnect() {

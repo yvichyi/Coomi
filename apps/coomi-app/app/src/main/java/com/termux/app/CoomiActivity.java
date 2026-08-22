@@ -100,6 +100,7 @@ public class CoomiActivity extends Activity {
     private String mPendingExportRequestId;
     private app.coomi.CoomiTTS mTts;
     private boolean mVoiceBroadcast = false;
+    private app.coomi.CoomiNotifier mNotifier;
     private final Runnable mExportTimeout = () -> {
         if (mPendingExportRequestId == null) return;
         String requestId = mPendingExportRequestId;
@@ -161,6 +162,22 @@ public class CoomiActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         navigateToRoute(intent);
+        handleShareIntent(intent);
+    }
+
+    private void handleShareIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!Intent.ACTION_SEND.equals(action)) return;
+        String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+        if (text == null || text.trim().isEmpty()) return;
+        final String sharedText = text.trim();
+        mHandler.postDelayed(() -> {
+            if (mWebView == null) return;
+            String js = "window.dispatchEvent(new CustomEvent('coomi:share-received', { detail: " 
+                + org.json.JSONObject.quote(sharedText) + " }))";
+            mWebView.evaluateJavascript(js, null);
+        }, 800);
     }
 
     @Override
@@ -174,6 +191,9 @@ public class CoomiActivity extends Activity {
         CoomiTheme.applySystemBars(this);
         if (mTts == null) {
             mTts = new app.coomi.CoomiTTS(this);
+        }
+        if (mNotifier == null) {
+            mNotifier = new app.coomi.CoomiNotifier(this);
         }
     }
 
@@ -542,6 +562,37 @@ public class CoomiActivity extends Activity {
         @JavascriptInterface
         public void stopSpeaking() {
             if (mTts != null) mTts.stop();
+        }
+
+        @JavascriptInterface
+        public void notify(String title, String body) {
+            if (mNotifier == null) mNotifier = new app.coomi.CoomiNotifier(CoomiActivity.this);
+            mNotifier.notify(title, body);
+        }
+
+        @JavascriptInterface
+        public String getClipboard() {
+            try {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm == null || !cm.hasPrimaryClip()) return "";
+                android.content.ClipData.Item item = cm.getPrimaryClip().getItemAt(0);
+                if (item == null) return "";
+                CharSequence text = item.getText();
+                return text != null ? text.toString() : "";
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void setClipboard(String text) {
+            try {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm == null) return;
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("coomi", text));
+            } catch (Exception e) {
+                Logger.logError(LOG_TAG, "Failed to set clipboard: " + e.getMessage());
+            }
         }
 
         @JavascriptInterface
@@ -963,6 +1014,7 @@ public class CoomiActivity extends Activity {
     protected void onDestroy() {
         mHandler.removeCallbacksAndMessages(null);
         if (mTts != null) { mTts.shutdown(); mTts = null; }
+        if (mNotifier != null) { mNotifier.cancelAll(); mNotifier = null; }
         if (mBound) {
             unbindService(mConnection);
             mBound = false;

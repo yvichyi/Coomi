@@ -153,13 +153,19 @@
         <!-- WebView host for the Coomi chat UI served by the bridge -->
         <activity
             android:name=".app.CoomiActivity"
-            android:exported="false"
+            android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|density|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
             android:label="@string/application_name"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:theme="@style/Theme.Coomi.Web"
-            tools:targetApi="n" />
+            tools:targetApi="n">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+        </activity>
         <service
             android:name="app.coomi.CoomiService"
             android:exported="false" />

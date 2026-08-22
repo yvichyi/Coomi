@@ -252,6 +252,25 @@ export const useConfigStore = defineStore('config', () => {
     localStorage.setItem('coomi.voiceBroadcast', String(enabled))
   }
 
+  function getClipboard(): string {
+    try {
+      return window.CoomiAndroid?.getClipboard?.() ?? ''
+    } catch { return '' }
+  }
+
+  function setClipboard(text: string): boolean {
+    try {
+      window.CoomiAndroid?.setClipboard?.(text)
+      return true
+    } catch { return false }
+  }
+
+  function notify(title: string, body: string) {
+    try {
+      window.CoomiAndroid?.notify?.(title, body)
+    } catch { /* not on Android */ }
+  }
+
   function cacheConnectionSettings(value: ConnectionSettings) {
     connectionSettings.value = { ...value }
     localStorage.setItem('coomi.providerRetryCount', String(value.providerRetryCount))
