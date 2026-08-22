@@ -5712,12 +5712,6 @@ impl AgentObserver for BrowserObserver {
                     "images": images,
                 }));
             }
-            AgentEvent::SpeakText(content) => {
-                self.task.push_event(json!({
-                    "event_type": "speak_text",
-                    "content": content,
-                }));
-            }
             AgentEvent::ModelUsage { total, request } => {
                 if let Ok(mut state) = self.usage.lock() {
                     state.turn_active = true;
@@ -5740,6 +5734,12 @@ impl AgentObserver for BrowserObserver {
                     state.turn_cache_data_available |= request.cache_data_available;
                 }
                 self.send_usage();
+            }
+            AgentEvent::SpeakText(content) => {
+                self.task.push_event(json!({
+                    "event_type": "speak_text",
+                    "content": content,
+                }));
             }
             AgentEvent::TurnCompleted { total, turn } => {
                 if let Ok(mut state) = self.usage.lock() {

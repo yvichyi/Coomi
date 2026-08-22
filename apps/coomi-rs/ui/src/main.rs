@@ -609,6 +609,7 @@ impl AgentObserver for TerminalObserver {
             }
             AgentEvent::TurnCompleted { total, .. } => print_usage(total),
             AgentEvent::ModelStarted { .. } => {}
+            AgentEvent::SpeakText(_) => {}
         }
     }
 }
