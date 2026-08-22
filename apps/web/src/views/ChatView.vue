@@ -53,10 +53,11 @@ function initBgCanvas() {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const cvs = canvas
+  const cvs: HTMLCanvasElement = canvas
+  const c: CanvasRenderingContext2D = ctx
   const resize = () => {
-    cvs.width = cvs.offsetWidth
-    cvs.height = cvs.offsetHeight
+    cvs.width = canvas!.offsetWidth
+    cvs.height = canvas!.offsetHeight
   }
   resize()
   const particles: { x: number; y: number; vx: number; vy: number; r: number; o: number }[] = []
@@ -74,15 +75,15 @@ function initBgCanvas() {
     })
   }
   function draw() {
-    ctx.clearRect(0, 0, cvs.width, cvs.height)
+    c.clearRect(0, 0, cvs.width, cvs.height)
     for (const p of particles) {
       p.x += p.vx; p.y += p.vy
       if (p.x < 0 || p.x > cvs.width) p.vx *= -1
       if (p.y < 0 || p.y > cvs.height) p.vy *= -1
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(150,180,220,' + p.o + ')'
-      ctx.fill()
+      c.beginPath()
+      c.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      c.fillStyle = 'rgba(150,180,220,' + p.o + ')'
+      c.fill()
     }
     bgAnimId = requestAnimationFrame(draw)
   }
