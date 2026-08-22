@@ -40,6 +40,27 @@ const scroller = ref<HTMLElement | null>(null)
 const virtualScroller = ref<InstanceType<typeof DynamicScroller> | null>(null)
 const content = ref<HTMLElement | null>(null)
 const drawerOpen = ref(false)
+const mood = ref<{ emotion: string; attention: string; bond: number } | null>(null)
+let moodTimer: ReturnType<typeof setInterval> | null = null
+const focusMode = ref(localStorage.getItem('coomi.focusMode') === 'true')
+const bubbleStyle = ref<'bubble' | 'flat' | 'tail'>(localStorage.getItem('coomi.bubbleStyle') as any || 'bubble')
+
+async function refreshMood() {
+  try {
+    const status = await apiGet<{ profile: { emotion: string; attention: string; bond: number } | null }>('/api/cognitive/status')
+    mood.value = status?.profile ?? null
+  } catch { /* cognitive not installed: mood stays null */ }
+}
+
+function toggleFocusMode() {
+  focusMode.value = !focusMode.value
+  localStorage.setItem('coomi.focusMode', String(focusMode.value))
+}
+
+function setBubbleStyle(style: 'bubble' | 'flat' | 'tail') {
+  bubbleStyle.value = style
+  localStorage.setItem('coomi.bubbleStyle', style)
+}
 /** 全局轮询「后台运行中」状态的定时器（会话列表转圈的数据源）。 */
 let runningPoll: ReturnType<typeof setInterval> | null = null
 
@@ -72,6 +93,8 @@ onMounted(() => {
   // 抽屉/会话页据此显示转圈。轮询常驻（本地 API 开销极小），不依赖抽屉打开。
   void sessions.refreshRunning()
   runningPoll = setInterval(() => sessions.refreshRunning(), 2000)
+  void refreshMood()
+  moodTimer = setInterval(refreshMood, 5000)
   // 高度只要变就重新贴底（内部有 rAF 合并，不怕高频触发）
   if (typeof ResizeObserver !== 'undefined') {
     ro = new ResizeObserver(() => follow())
@@ -91,6 +114,7 @@ onBeforeUnmount(() => {
   session.flushPersistence()
   if (runningPoll) { clearInterval(runningPoll); runningPoll = null }
   ro?.disconnect(); ro = null
+  if (moodTimer) { clearInterval(moodTimer); moodTimer = null }
 })
 
 /**
@@ -138,8 +162,17 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
 
 <template>
   <div class="chat">
-    <div class="shell" :class="{ pushed: drawerOpen }">
-      <TopBar @menu="openDrawer" />
+    <div class="shell" :class="{ pushed: drawerOpen, focus: focusMode, flat: bubbleStyle === 'flat', tail: bubbleStyle === 'tail' }">
+      <TopBar @menu="openDrawer">
+        <template #extra>
+          <button class="icon-btn focus-btn" :class="{ on: focusMode }" aria-label="专注模式" @click="toggleFocusMode">
+            <CoomiIcon name="maximize" :size="17}" />
+          </button>
+          <button class="icon-btn" aria-label="气泡样式" @click="setBubbleStyle(bubbleStyle === 'bubble' ? 'flat' : bubbleStyle === 'flat' ? 'tail' : 'bubble')">
+            <CoomiIcon name="message" :size="17}" />
+          </button>
+        </template>
+      </TopBar>
 
       <main ref="scroller" class="stream">
         <div v-if="session.timeline.length === 0" ref="content" class="inner empty-inner">
@@ -184,6 +217,11 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
         </div>
       </div>
       <StatusBar />
+      <div v-if="mood" class="mood-bar">
+        <span class="mood-item"><CoomiIcon name="heart" :size="13" />{{ mood.emotion }}</span>
+        <span class="mood-item"><CoomiIcon name="eye" :size="13" />{{ mood.attention }}</span>
+        <span class="mood-item bond"><CoomiIcon name="link" :size="13" />{{ Math.round(mood.bond * 100) }}%</span>
+      </div>
       <Composer />
     </div>
 
@@ -242,6 +280,18 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
   width: 100%; min-width: 0; min-height: 100%; padding: 10px 12px 18px; overflow-x: hidden;
 }
 .empty-inner { min-height: 100%; }
+.icon-btn { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--text-2); }
+.icon-btn.on { background: var(--blue-soft); color: var(--blue); }
+.icon-btn:active { background: var(--fill); }
+.shell.focus :deep(.top-bar),
+.shell.focus :deep(.status-bar),
+.shell.focus :deep(.mood-bar) { display: none; }
+.shell.focus .stream { padding-top: 10px; }
+.shell.flat :deep(.bubble) { border-radius: 12px; }
+.shell.tail :deep(.bubble) { border-radius: 12px 12px 0 12px; }
+.mood-bar { display: flex; gap: 12px; padding: 4px 16px; background: var(--bg); border-top: 1px solid var(--border); }
+.mood-item { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
+.mood-item.bond { margin-left: auto; }
 .virtual-stream { width: 100%; min-width: 0; padding: 10px 12px 18px; overflow: visible; }
 .virtual-item { width: 100%; min-width: 0; padding-bottom: 12px; }
 

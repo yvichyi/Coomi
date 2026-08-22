@@ -148,6 +148,8 @@ function browseInFileManager() {
       </section>
     </div>
 
+    <slot name="extra" />
+
     <button class="usage-button" :aria-expanded="usageOpen" aria-label="上下文用量" @click="toggleUsage">
       <svg class="usage-ring" viewBox="0 0 36 36" aria-hidden="true">
         <circle class="usage-track" cx="18" cy="18" r="15" pathLength="100" />

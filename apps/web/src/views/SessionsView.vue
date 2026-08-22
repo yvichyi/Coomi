@@ -37,6 +37,14 @@ function doPin() {
   menuFor.value = null
 }
 
+const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#db2777', '#0891b2', '#65a30d']
+async function setColor(color: string) {
+  if (!menuFor.value) return
+  const target = menuFor.value.color === color ? '' : color
+  await sessions.setColor(menuFor.value.id, target)
+  menuFor.value.color = target
+}
+
 function confirmDelete() {
   if (askDelete.value) session.deleteSession(askDelete.value.id)
   askDelete.value = null
@@ -91,6 +99,7 @@ onMounted(() => {
               <button class="rmain" @click="open(m.id)">
                 <span class="rtitle">
                   <CoomiIcon v-if="m.pinned" name="pin" :size="13" class="pin" />
+                  <span v-if="m.color" class="color-tag" :style="{ background: m.color }" />
                   <span class="ttext">{{ m.title }}</span>
                 </span>
                 <span v-if="m.summary" class="rsummary">{{ m.summary }}</span>
@@ -118,6 +127,9 @@ onMounted(() => {
         <button class="sact" @click="doPin">
           <CoomiIcon name="pin" :size="17" /><span>{{ menuFor.pinned ? '取消置顶' : '置顶' }}</span>
         </button>
+        <div class="color-row">
+          <button v-for="c in COLORS" :key="c" class="color-dot" :class="{ on: menuFor.color === c }" :style="{ background: c }" @click="setColor(c)" />
+        </div>
         <button class="sact danger" @click="askDelete = menuFor; menuFor = null">
           <CoomiIcon name="trash" :size="17" /><span>删除会话</span>
         </button>
@@ -178,6 +190,10 @@ onMounted(() => {
 .rmain:active { background: var(--fill); }
 .rtitle { display: flex; align-items: center; gap: 5px; }
 .pin { flex-shrink: 0; color: var(--blue); }
+.color-tag { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
+.color-row { display: flex; gap: 8px; padding: 12px; flex-wrap: wrap; }
+.color-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
+.color-dot.on { border-color: var(--text); }
 .rmeta { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--text-3); }
 /* 会话在后台执行中的小圈（放在时间/轮数之后，与 meta 文字同高） */
 .rspin {

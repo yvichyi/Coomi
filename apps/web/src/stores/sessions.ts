@@ -28,6 +28,8 @@ export interface SessionMeta {
   updatedAt: number
   turns: number
   pinned: boolean
+  /** 会话颜色标签 */
+  color?: string
   /** 创建该会话时的工作目录；用于把不同项目的会话隔离开。 */
   cwd?: string
   /** 引擎侧一句话摘要（/api/sessions 的 summary），用于检索与展示。 */
@@ -366,10 +368,19 @@ export const useSessionsStore = defineStore('sessions', () => {
       persist()
       return true
     } catch {
+  
       m.pinned = previous
       persist()
       return false
     }
+  }
+
+  async function setColor(id: string, color: string): Promise<boolean> {
+    const m = find(id)
+    if (!m) return false
+    m.color = color
+    persist()
+    return true
   }
 
   function remove(id: string) {
@@ -476,6 +487,8 @@ export const useSessionsStore = defineStore('sessions', () => {
         created_at: string
         title_manually_set: boolean
         pinned: boolean
+  /** 会话颜色标签 */
+  color?: string
         mode?: 'agent' | 'life'
       }>
       const localById = new Map(metas.value.map(m => [m.id, m]))
@@ -529,6 +542,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     tasks, runningIds, taskConcurrencyLimit, refreshTasks, cancelTask, taskAction, taskDetail,
     syncFromEngine,
     ensure, touch, setMode, rename, togglePin, remove, find, deriveTitle,
+    setColor,
     saveTranscript, loadTranscript, migrateId, clearAll,
     refreshRunning, isRunning,
   }
