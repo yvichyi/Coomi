@@ -60,6 +60,12 @@ jobs:
           COOMI_SIGNING_STORE_PASSWORD: ${{ secrets.COOMI_SIGNING_STORE_PASSWORD }}
           COOMI_SIGNING_KEY_PASSWORD: ${{ secrets.COOMI_SIGNING_KEY_PASSWORD }}
 
+      - name: Install frontend dependencies
+        run: |
+          cd apps/web
+          npm ci
+          cd ../..
+
       - name: Build CoomiDev APK
         run: |
           chmod +x gradlew
