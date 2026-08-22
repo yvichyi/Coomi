@@ -93,8 +93,49 @@ public class CoomiTTS {
         if (mReady) mTts.setSpeechRate(rate);
     }
 
+    public float getRate() {
+        return mRate;
+    }
+
     public boolean isReady() {
         return mReady;
+    }
+
+    public String getVoicesJson() {
+        if (!mReady) return "[]";
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (android.speech.tts.Voice v : mTts.getVoices()) {
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("name", v.getName());
+                o.put("locale", v.getLocale().toString());
+                o.put("network", v.isNetworkConnectionRequired());
+                arr.put(o);
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    public boolean setVoice(String voiceName) {
+        if (!mReady) return false;
+        for (android.speech.tts.Voice v : mTts.getVoices()) {
+            if (v.getName().equals(voiceName)) {
+                mTts.setVoice(v);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void setPitch(float pitch) {
+        mPitch = pitch;
+        if (mReady) mTts.setPitch(pitch);
+    }
+
+    public float getPitch() {
+        return mPitch;
     }
 
     public void shutdown() {

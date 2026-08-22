@@ -101,6 +101,8 @@ public class CoomiActivity extends Activity {
     private app.coomi.CoomiTTS mTts;
     private boolean mVoiceBroadcast = false;
     private app.coomi.CoomiNotifier mNotifier;
+    private app.coomi.CoomiSTT mStt;
+    private String mSttCallbackId;
     private final Runnable mExportTimeout = () -> {
         if (mPendingExportRequestId == null) return;
         String requestId = mPendingExportRequestId;
@@ -194,6 +196,9 @@ public class CoomiActivity extends Activity {
         }
         if (mNotifier == null) {
             mNotifier = new app.coomi.CoomiNotifier(this);
+        }
+        if (mStt == null) {
+            mStt = new app.coomi.CoomiSTT(this);
         }
     }
 
@@ -565,6 +570,32 @@ public class CoomiActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getVoices() {
+            if (mTts == null) mTts = new app.coomi.CoomiTTS(CoomiActivity.this);
+            return mTts.getVoicesJson();
+        }
+
+        @JavascriptInterface
+        public boolean setVoice(String voiceName) {
+            if (mTts == null) mTts = new app.coomi.CoomiTTS(CoomiActivity.this);
+            return mTts.setVoice(voiceName);
+        }
+
+        @JavascriptInterface
+        public void setSpeechRate(float rate) {
+            if (mTts == null) mTts = new app.coomi.CoomiTTS(CoomiActivity.this);
+            mTts.setRate(rate);
+            android.content.SharedPreferences prefs = getSharedPreferences("coomi", Context.MODE_PRIVATE);
+            prefs.edit().putFloat("speechRate", rate).apply();
+        }
+
+        @JavascriptInterface
+        public float getSpeechRate() {
+            android.content.SharedPreferences prefs = getSharedPreferences("coomi", Context.MODE_PRIVATE);
+            return prefs.getFloat("speechRate", 1.0f);
+        }
+
+        @JavascriptInterface
         public void notify(String title, String body) {
             if (mNotifier == null) mNotifier = new app.coomi.CoomiNotifier(CoomiActivity.this);
             mNotifier.notify(title, body);
@@ -582,6 +613,58 @@ public class CoomiActivity extends Activity {
             } catch (Exception e) {
                 return "";
             }
+        }
+
+        @JavascriptInterface
+        public boolean isSttAvailable() {
+            return mStt != null && mStt.isAvailable();
+        }
+
+        @JavascriptInterface
+        public void startDictation(String callbackId) {
+            mSttCallbackId = callbackId;
+            if (mStt == null) mStt = new app.coomi.CoomiSTT(CoomiActivity.this);
+            if (!mStt.isAvailable()) {
+                jsSttError(callbackId, "语音识别不可用");
+                return;
+            }
+            mStt.start(new app.coomi.CoomiSTT.SttListener() {
+                @Override public void onResult(String text) { jsSttResult(callbackId, text); }
+                @Override public void onError(String error) { jsSttError(callbackId, error); }
+                @Override public void onPartial(String text) { jsSttPartial(callbackId, text); }
+            });
+        }
+
+        @JavascriptInterface
+        public void stopDictation() {
+            if (mStt != null) mStt.stop();
+        }
+
+        private void jsSttResult(String cb, String text) {
+            mHandler.post(() -> {
+                if (mWebView == null) return;
+                String js = "window.__coomiSttResult && window.__coomiSttResult("
+                    + org.json.JSONObject.quote(cb) + ", " + org.json.JSONObject.quote(text) + ")";
+                mWebView.evaluateJavascript(js, null);
+            });
+        }
+
+        private void jsSttPartial(String cb, String text) {
+            mHandler.post(() -> {
+                if (mWebView == null) return;
+                String js = "window.__coomiSttPartial && window.__coomiSttPartial("
+                    + org.json.JSONObject.quote(cb) + ", " + org.json.JSONObject.quote(text) + ")";
+                mWebView.evaluateJavascript(js, null);
+            });
+        }
+
+        private void jsSttError(String cb, String error) {
+            mHandler.post(() -> {
+                if (mWebView == null) return;
+                String js = "window.__coomiSttError && window.__coomiSttError("
+                    + org.json.JSONObject.quote(cb) + ", " + org.json.JSONObject.quote(error) + ")";
+                mWebView.evaluateJavascript(js, null);
+            });
         }
 
         @JavascriptInterface

@@ -3,7 +3,7 @@
  * 设置。分组白卡 + 行的结构，选中态用蓝勾而不是描边 ——
  * 和抽屉、空态里的选中语言保持一致。
  */
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConfigStore, DEFAULT_CONNECTION_SETTINGS, PERMISSION_MODES, REASONING_EFFORTS, type ConnectionSettings } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
@@ -24,6 +24,45 @@ const reconnectInitialSeconds = ref(config.connectionSettings.reconnectInitialDe
 const reconnectMaxSeconds = ref(config.connectionSettings.reconnectMaxDelayMs / 1000)
 const connectionError = ref('')
 const connectionSaved = ref(false)
+const sttAvailable = ref(false)
+const voices = ref<Array<{ name: string; locale: string }>>([])
+const selectedVoice = ref('')
+const speechRate = ref(1.0)
+
+function loadVoices() {
+  try {
+    const json = window.CoomiAndroid?.getVoices?.() ?? '[]'
+    voices.value = JSON.parse(json)
+  } catch { voices.value = [] }
+}
+
+function loadSpeechRate() {
+  speechRate.value = window.CoomiAndroid?.getSpeechRate?.() ?? 1.0
+}
+
+async function refreshSttAvailability() {
+  try {
+    sttAvailable.value = !!window.CoomiAndroid?.isSttAvailable?.()
+  } catch { sttAvailable.value = false }
+}
+
+function onSpeechRateChange() {
+  window.CoomiAndroid?.setSpeechRate?.(speechRate.value)
+}
+
+async function onVoiceChange() {
+  if (!selectedVoice.value) return
+  window.CoomiAndroid?.setVoice?.(selectedVoice.value)
+}
+
+onMounted(() => {
+  void refreshSttAvailability()
+  loadVoices()
+  loadSpeechRate()
+})
+
+watch(speechRate, onSpeechRateChange)
+watch(selectedVoice, onVoiceChange)
 function resetConnectionSettings() {
   connectionDraft.value = { ...DEFAULT_CONNECTION_SETTINGS }
   reconnectInitialSeconds.value = DEFAULT_CONNECTION_SETTINGS.reconnectInitialDelayMs / 1000
@@ -195,6 +234,30 @@ onMounted(async () => {
         <button class="sw" :class="{ on: config.voiceBroadcast }" role="switch" :aria-checked="config.voiceBroadcast" @click="session.setVoiceBroadcast(!config.voiceBroadcast)"></button>
       </div>
 
+      <p class="sec-label">语音输入</p>
+      <div class="group stt-section">
+        <div class="number-row">
+          <span class="rt"><span class="rmain">启用语音输入</span><span class="rsub">在输入框左侧显示麦克风按钮</span></span>
+          <button class="sw" :class="{ on: config.sttEnabled }" role="switch" :aria-checked="config.sttEnabled" @click="config.setSttEnabled(!config.sttEnabled)"></button>
+        </div>
+        <p v-if="!sttAvailable" class="note warn">此设备不支持语音识别</p>
+      </div>
+
+      <p class="sec-label">语音播报</p>
+      <div class="group tts-section">
+        <div class="number-row">
+          <span class="rt"><span class="rmain">语速</span><span class="rsub">{{ Number(speechRate).toFixed(1) }}x</span></span>
+          <input v-model.number="speechRate" type="range" min="0.5" max="2" step="0.1" aria-label="语速" />
+        </div>
+        <div class="number-row" v-if="voices.length">
+          <span class="rt"><span class="rmain">音色</span><span class="rsub">{{ selectedVoice || '系统默认' }}</span></span>
+          <select v-model="selectedVoice">
+            <option value="">系统默认</option>
+            <option v-for="v in voices" :key="v.name" :value="v.name">{{ v.name }} ({{ v.locale }})</option>
+          </select>
+        </div>
+      </div>
+
       <p class="sec-label">连接、重试与并发</p>
       <div class="group numeric-settings">
         <label class="number-row">
@@ -343,6 +406,9 @@ onMounted(async () => {
 .tick { flex-shrink: 0; color: var(--blue); }
 .arw { flex-shrink: 0; color: var(--text-3); }
 .empty { padding: 15px 14px; font-size: 13px; line-height: 1.6; color: var(--text-3); }
+.note.warn { color: var(--orange); font-size: 11.5px; padding: 6px 13px; }
+.stt-section select, .tts-section select { height: 38px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--page); color: var(--text); }
+.tts-section input[type="range"] { width: 140px; }
 
 .sw {
   position: relative; flex-shrink: 0;

@@ -177,6 +177,8 @@ export const useConfigStore = defineStore('config', () => {
   const savedVoiceBroadcast = localStorage.getItem('coomi.voiceBroadcast') === 'true'
   const voiceBroadcast = ref(savedVoiceBroadcast)
   const subAgentSettings = ref<SubAgentSettings>({ agents: [] })
+  const sttEnabled = ref(localStorage.getItem('coomi.sttEnabled') === 'true')
+  const speechRate = ref(localStorage.getItem('coomi.speechRate') ?? '1')
   const connectionSettings = ref<ConnectionSettings>({
     providerRetryCount: readStoredInt('coomi.providerRetryCount', 0, 10, DEFAULT_CONNECTION_SETTINGS.providerRetryCount),
     wsRetryCount: readStoredInt('coomi.wsRetryCount', 0, 30, DEFAULT_CONNECTION_SETTINGS.wsRetryCount),
@@ -250,6 +252,10 @@ export const useConfigStore = defineStore('config', () => {
   function setVoiceBroadcast(enabled: boolean) {
     voiceBroadcast.value = enabled
     localStorage.setItem('coomi.voiceBroadcast', String(enabled))
+  }
+  function setSttEnabled(enabled: boolean) {
+    sttEnabled.value = enabled
+    localStorage.setItem('coomi.sttEnabled', String(enabled))
   }
 
   function getClipboard(): string {

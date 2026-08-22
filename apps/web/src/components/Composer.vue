@@ -36,6 +36,35 @@ const hasNative = typeof window !== 'undefined' && !!window.CoomiAndroid
 const canSend = computed(() => text.value.trim().length > 0)
 const isJumpIn = computed(() => session.isBusy && canSend.value)
 const showStop = computed(() => session.isBusy && !canSend.value)
+const isListening = ref(false)
+let sttCallbackId = ''
+
+function toggleDictation() {
+  if (isListening.value) {
+    window.CoomiAndroid?.stopDictation?.()
+    isListening.value = false
+    return
+  }
+  if (!window.CoomiAndroid?.isSttAvailable?.()) return
+  isListening.value = true
+  sttCallbackId = 'stt_' + Date.now()
+  window.__coomiSttResult = (cb, text) => {
+    if (cb !== sttCallbackId) return
+    text.value = (text.value + ' ').trimEnd() + text
+    isListening.value = false
+    autoGrow()
+  }
+  window.__coomiSttPartial = (cb, text) => {
+    if (cb !== sttCallbackId) return
+    text.value = text
+    autoGrow()
+  }
+  window.__coomiSttError = (cb, error) => {
+    if (cb !== sttCallbackId) return
+    isListening.value = false
+  }
+  window.CoomiAndroid?.startDictation?.(sttCallbackId)
+}
 const modeLabel = computed(() => PERMISSION_MODES.find(m => m.mode === config.permissionMode)?.label ?? '')
 const providerReady = computed(() => config.providers.some(provider => (
   provider.id === config.activeId
