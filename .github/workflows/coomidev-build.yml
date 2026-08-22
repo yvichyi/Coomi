@@ -66,6 +66,14 @@ jobs:
           npm ci
           cd ../..
 
+      - name: Download Runtime V2 assets
+        run: |
+          mkdir -p runtime-v2-dist
+          cd runtime-v2-dist
+          curl -L -o proot-host-arm64.tar.gz "https://github.com/TensorHub-ORG/Coomi/releases/download/runtime-v2-debian-bookworm-20260803/proot-host-arm64.tar.gz" --retry 3 --retry-delay 5
+          curl -L -o debian-bookworm-arm64.tar.gz "https://github.com/TensorHub-ORG/Coomi/releases/download/runtime-v2-debian-bookworm-20260803/debian-bookworm-arm64.tar.gz" --retry 3 --retry-delay 5
+          cd ../..
+
       - name: Build CoomiDev APK
         run: |
           chmod +x gradlew
