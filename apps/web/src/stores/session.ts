@@ -11,6 +11,7 @@ import { nextId } from '@/bridge/envelope'
 import { useConnectionStore } from './connection'
 import { useConfigStore } from './config'
 import { useSessionsStore } from './sessions'
+import { detectAsciiArt } from '@/utils/asciiArt'
 import { router } from '@/router'
 import type { AssistantMessage, LoopProgress, QuestionCard, ReasoningBlock, RunState, Timelineitem, ToolCard, ToolDiagnosticTrace } from './viewModel'
 
@@ -415,6 +416,15 @@ export const useSessionStore = defineStore('session', () => {
     runState.value = 'thinking'
     transport.value?.send({ command: 'send_message', text: trimmed })
     persistSoon()
+    // ASCII art easter egg
+    void detectAsciiArt(trimmed).then(art => {
+      if (art) {
+        setTimeout(() => {
+          timeline.value.push({ kind: 'assistant', id: nextId(), content: '```\n' + art + '\n```', streaming: false })
+          persistSoon()
+        }, 600 + Math.random() * 600)
+      }
+    })
   }
 
   function cancel() { transport.value?.send({ command: 'cancel' }) }

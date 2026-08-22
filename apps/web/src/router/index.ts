@@ -19,5 +19,6 @@ export const router = createRouter({
     { path: '/hooks', name: 'hooks', component: () => import('@/views/HooksView.vue') },
     { path: '/memory', name: 'memory', component: () => import('@/views/MemoryView.vue') },
     { path: '/files', name: 'files', component: () => import('@/views/FileManagerView.vue') },
+    { path: '/stats', name: 'stats', component: () => import('@/views/StatsView.vue') },
   ],
 })

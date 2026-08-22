@@ -111,6 +111,10 @@ function openDashboard() {
         <span>任务中心</span>
         <span v-if="sessions.runningIds.size" class="task-count">{{ sessions.runningIds.size }}</span>
       </button>
+      <button class="taskrow" @click="go('/stats')">
+        <CoomiIcon name="barChart" :size="17" />
+        <span>使用统计</span>
+      </button>
 
       <div class="list">
         <!-- 历史会话列表始终可见；「全局会话记忆」开关只控制模型能否读取这些记录。 -->

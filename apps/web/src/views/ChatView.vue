@@ -44,6 +44,45 @@ const mood = ref<{ emotion: string; attention: string; bond: number } | null>(nu
 let moodTimer: ReturnType<typeof setInterval> | null = null
 const focusMode = ref(localStorage.getItem('coomi.focusMode') === 'true')
 const bubbleStyle = ref<'bubble' | 'flat' | 'tail'>(localStorage.getItem('coomi.bubbleStyle') as any || 'bubble')
+const bgMode = ref<'none' | 'particles' | 'aurora'>(localStorage.getItem('coomi.bgMode') as any || 'none')
+const bgCanvas = ref<HTMLCanvasElement | null>(null)
+let bgAnimId = 0
+
+function initBgCanvas() {
+  const canvas = bgCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight }
+  resize()
+  const particles: { x: number; y: number; vx: number; vy: number; r: number; o: number }[] = []
+  const COUNT = Math.min(50, Math.floor(canvas.width * canvas.height / 12000))
+  for (let i = 0; i < COUNT; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 2 + 1,
+      o: Math.random() * 0.4 + 0.1,
+    })
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(150,180,220,${p.o})`
+      ctx.fill()
+    }
+    bgAnimId = requestAnimationFrame(draw)
+  }
+  draw()
+  window.addEventListener('resize', resize)
+}
 
 async function refreshMood() {
   try {
@@ -60,6 +99,13 @@ function toggleFocusMode() {
 function setBubbleStyle(style: 'bubble' | 'flat' | 'tail') {
   bubbleStyle.value = style
   localStorage.setItem('coomi.bubbleStyle', style)
+}
+
+function cycleBgMode() {
+  const modes: Array<'none' | 'particles' | 'aurora'> = ['none', 'particles', 'aurora']
+  const idx = modes.indexOf(bgMode.value)
+  bgMode.value = modes[(idx + 1) % modes.length]
+  localStorage.setItem('coomi.bgMode', bgMode.value)
 }
 /** 全局轮询「后台运行中」状态的定时器（会话列表转圈的数据源）。 */
 let runningPoll: ReturnType<typeof setInterval> | null = null
@@ -95,6 +141,9 @@ onMounted(() => {
   runningPoll = setInterval(() => sessions.refreshRunning(), 2000)
   void refreshMood()
   moodTimer = setInterval(refreshMood, 5000)
+  if (bgMode.value === 'particles') {
+    nextTick(initBgCanvas)
+  }
   // 高度只要变就重新贴底（内部有 rAF 合并，不怕高频触发）
   if (typeof ResizeObserver !== 'undefined') {
     ro = new ResizeObserver(() => follow())
@@ -115,6 +164,7 @@ onBeforeUnmount(() => {
   if (runningPoll) { clearInterval(runningPoll); runningPoll = null }
   ro?.disconnect(); ro = null
   if (moodTimer) { clearInterval(moodTimer); moodTimer = null }
+  if (bgAnimId) { cancelAnimationFrame(bgAnimId); bgAnimId = 0 }
 })
 
 /**
@@ -162,6 +212,8 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
 
 <template>
   <div class="chat">
+        <canvas v-if="bgMode === 'particles'" ref="bgCanvas" class="bg-particles" />
+    <div v-if="bgMode === 'aurora'" class="bg-aurora" />
     <div class="shell" :class="{ pushed: drawerOpen, focus: focusMode, flat: bubbleStyle === 'flat', tail: bubbleStyle === 'tail' }">
       <TopBar @menu="openDrawer">
         <template #extra>
@@ -170,6 +222,9 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
           </button>
           <button class="icon-btn" aria-label="气泡样式" @click="setBubbleStyle(bubbleStyle === 'bubble' ? 'flat' : bubbleStyle === 'flat' ? 'tail' : 'bubble')">
             <CoomiIcon name="message" :size="17}" />
+          </button>
+          <button class="icon-btn" :class="{ on: bgMode !== 'none' }" aria-label="动态背景" @click="cycleBgMode">
+            <CoomiIcon name="sparkle" :size="17}" />
           </button>
         </template>
       </TopBar>
@@ -250,7 +305,27 @@ watch(() => session.pendingQuestion?.callId, (id, previous) => {
     var(--chat-background-image);
   background-position: center;
   background-size: cover;
+  position: relative;
+  overflow: hidden;
 }
+.bg-particles {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+}
+.bg-aurora {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--ok) 25%, var(--orange) 50%, var(--blue) 75%, var(--ok) 100%);
+  background-size: 400% 400%;
+  opacity: 0.06;
+  animation: aurora-shift 18s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes aurora-shift {
+  0%, 100% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 50% 100%; }
+  75% { background-position: 50% 0%; }
+}
+.shell { position: relative; z-index: 1; }
 
 .shell {
   position: relative;
