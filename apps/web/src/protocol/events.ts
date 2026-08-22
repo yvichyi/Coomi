@@ -58,6 +58,7 @@ export interface SessionLoadedEvent {
   cwd: string
   usage: { input_tokens: number; output_tokens: number; total_tokens: number }
 }
+export interface SpeakTextEvent { event_type: 'speak_text'; content: string }
 
 export type AgentEvent = (
   | TextChunkEvent | ReasoningChunkEvent | ToolStartEvent | ToolRunningEvent
@@ -69,6 +70,7 @@ export type AgentEvent = (
   | TurnEndEvent
   | SessionStateEvent
   | SessionLoadedEvent
+  | SpeakTextEvent
 ) & { event_seq?: number }
 
 export type AgentEventType = AgentEvent['event_type']

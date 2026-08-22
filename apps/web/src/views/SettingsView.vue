@@ -189,6 +189,12 @@ onMounted(async () => {
       </div>
       <p class="option-note">默认 192，256 为进阶选项，512 为硬上限。</p>
 
+      <p class="sec-label">语音播报</p>
+      <div class="group toggle-row">
+        <span class="rt"><span class="rmain">启用语音播报</span><span class="rsub">Agent 回复完成后自动朗读正文</span></span>
+        <button class="sw" :class="{ on: config.voiceBroadcast }" role="switch" :aria-checked="config.voiceBroadcast" @click="session.setVoiceBroadcast(!config.voiceBroadcast)"></button>
+      </div>
+
       <p class="sec-label">连接、重试与并发</p>
       <div class="group numeric-settings">
         <label class="number-row">

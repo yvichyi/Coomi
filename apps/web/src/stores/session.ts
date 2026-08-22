@@ -157,6 +157,11 @@ export const useSessionStore = defineStore('session', () => {
 
   function applyEvent(ev: AgentEvent) {
     switch (ev.event_type) {
+      case 'speak_text':
+        if (config.voiceBroadcast.value && window.CoomiAndroid?.speakText) {
+          window.CoomiAndroid.speakText(ev.content)
+        }
+        break
       // 兜底：turn_end 之后又开始吐字（引擎续了一轮），状态得跟着回到忙。
       case 'text_chunk': connection.setRetry(null); if (runState.value === 'idle') runState.value = 'thinking'; appendAssistant(ev.content); break
       case 'reasoning_chunk': if (runState.value === 'idle') runState.value = 'thinking'; appendReasoning(ev.content); break
@@ -359,6 +364,14 @@ export const useSessionStore = defineStore('session', () => {
   function setMaxToolRounds(rounds: number) {
     config.setMaxToolRounds(rounds)
     transport.value?.send({ command: 'set_max_tool_rounds', rounds: config.maxToolRounds })
+  }
+
+  function setVoiceBroadcast(enabled: boolean) {
+    config.setVoiceBroadcast(enabled)
+    transport.value?.send({ command: 'set_voice_broadcast', enabled })
+    if (window.CoomiAndroid?.setVoiceBroadcast) {
+      window.CoomiAndroid.setVoiceBroadcast(enabled)
+    }
   }
 
   function cancelRunningTools() {
@@ -662,7 +675,7 @@ export const useSessionStore = defineStore('session', () => {
     if (notice?.kind === 'notice') Object.assign(notice, patch)
   }
 
-  return { sessionId, mode, timeline, runState, usage, retryConfirmation, cwd, loop, isBusy, pendingApproval, pendingQuestion, connect, reconnect, disconnect, flushPersistence, sendMessage, cancel, approve, answerQuestion, setPermissionMode, setReasoningEffort, setMaxToolRounds, setSessionMode, togglePlanMode, selectModel, retryInterruptedTurn, dismissRetry, completeFileTransfer, newSession, openSession, deleteSession, setSessionCwd, sendGuide, consentToolFailureFeedback, finishToolFailureFeedback }
+  return { sessionId, mode, timeline, runState, usage, retryConfirmation, cwd, loop, isBusy, pendingApproval, pendingQuestion, connect, reconnect, disconnect, flushPersistence, sendMessage, cancel, approve, answerQuestion, setPermissionMode, setReasoningEffort, setMaxToolRounds, setVoiceBroadcast, setSessionMode, togglePlanMode, selectModel, retryInterruptedTurn, dismissRetry, completeFileTransfer, newSession, openSession, deleteSession, setSessionCwd, sendGuide, consentToolFailureFeedback, finishToolFailureFeedback }
 })
 
 function fmtTokens(n: number): string { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n) }

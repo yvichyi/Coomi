@@ -290,10 +290,12 @@ public final class TerminalBuffer {
                     lastNonSpaceIndex = oldLine.getSpaceUsed();
                     if (cursorAtThisRow) justToCursor = true;
                 } else {
-                    for (int i = 0; i < oldLine.getSpaceUsed(); i++)
-                        // NEWLY INTRODUCED BUG! Should not index oldLine.mStyle with char indices
-                        if (oldLine.mText[i] != ' '/* || oldLine.mStyle[i] != currentStyle */)
-                            lastNonSpaceIndex = i + 1;
+                    for (int i = 0; i < oldLine.getSpaceUsed(); i++) {
+                        // Use char index (not cell/byte index). For wide chars (CJK/emoji)
+                        // the cell count differs from the char count; mStyle indexing must use
+                        // cell positions via getStyle(col), not raw char positions here.
+                        if (oldLine.mText[i] != ' ') lastNonSpaceIndex = i + 1;
+                    }
                 }
 
                 int currentOldCol = 0;

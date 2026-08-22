@@ -98,6 +98,8 @@ public class CoomiActivity extends Activity {
     private String mPendingExportName;
     private String mPendingImportRequestId;
     private String mPendingExportRequestId;
+    private app.coomi.CoomiTTS mTts;
+    private boolean mVoiceBroadcast = false;
     private final Runnable mExportTimeout = () -> {
         if (mPendingExportRequestId == null) return;
         String requestId = mPendingExportRequestId;
@@ -516,6 +518,29 @@ public class CoomiActivity extends Activity {
             runOnUiThread(CoomiActivity.this::launchImportPicker);
         }
 
+        /** 语音播报开关：前端设置页切换。 */
+        @JavascriptInterface
+        public void setVoiceBroadcast(boolean enabled) {
+            mVoiceBroadcast = enabled;
+            if (!enabled && mTts != null) mTts.stop();
+        }
+
+        /** 前端触发：朗读指定文本。 */
+        @JavascriptInterface
+        public void speakText(String text) {
+            if (!mVoiceBroadcast) return;
+            if (mTts == null) {
+                mTts = new app.coomi.CoomiTTS(CoomiActivity.this);
+            }
+            mTts.speak(text);
+        }
+
+        /** 前端触发：停止朗读。 */
+        @JavascriptInterface
+        public void stopSpeaking() {
+            if (mTts != null) mTts.stop();
+        }
+
         @JavascriptInterface
         public void authorizeFolder() {
             runOnUiThread(() -> {
@@ -912,8 +937,17 @@ public class CoomiActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (mTts == null) {
+            mTts = new app.coomi.CoomiTTS(this);
+        }
+    }
+
+    @Override
     protected void onPause() {
         evaluateJavascript("window.dispatchEvent(new Event('coomi:flush-persistence'))");
+        if (mTts != null) mTts.stop();
         super.onPause();
     }
 
@@ -933,6 +967,7 @@ public class CoomiActivity extends Activity {
     @Override
     protected void onDestroy() {
         mHandler.removeCallbacksAndMessages(null);
+        if (mTts != null) { mTts.shutdown(); mTts = null; }
         if (mBound) {
             unbindService(mConnection);
             mBound = false;

@@ -174,6 +174,8 @@ export const useConfigStore = defineStore('config', () => {
   const reasoningEffort = ref<ReasoningEffort>(REASONING_EFFORTS.some(item => item.value === savedEffort) ? savedEffort! : 'auto')
   const savedRounds = Number(localStorage.getItem('coomi.maxToolRounds'))
   const maxToolRounds = ref([192, 256, 512].includes(savedRounds) ? savedRounds : 192)
+  const savedVoiceBroadcast = localStorage.getItem('coomi.voiceBroadcast') === 'true'
+  const voiceBroadcast = ref(savedVoiceBroadcast)
   const subAgentSettings = ref<SubAgentSettings>({ agents: [] })
   const connectionSettings = ref<ConnectionSettings>({
     providerRetryCount: readStoredInt('coomi.providerRetryCount', 0, 10, DEFAULT_CONNECTION_SETTINGS.providerRetryCount),
@@ -244,6 +246,10 @@ export const useConfigStore = defineStore('config', () => {
   function setMaxToolRounds(rounds: number) {
     maxToolRounds.value = [192, 256, 512].includes(rounds) ? rounds : 192
     localStorage.setItem('coomi.maxToolRounds', String(maxToolRounds.value))
+  }
+  function setVoiceBroadcast(enabled: boolean) {
+    voiceBroadcast.value = enabled
+    localStorage.setItem('coomi.voiceBroadcast', String(enabled))
   }
 
   function cacheConnectionSettings(value: ConnectionSettings) {
@@ -582,9 +588,9 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   return {
-    permissionMode, planMode, themeMode, reasoningEffort, maxToolRounds, connectionSettings, globalMemory, digitalLifeEnabled, customPrompt, providers, activeId, loading, usingMock, lastError, subAgentSettings,
+    permissionMode, planMode, themeMode, reasoningEffort, maxToolRounds, voiceBroadcast, connectionSettings, globalMemory, digitalLifeEnabled, customPrompt, providers, activeId, loading, usingMock, lastError, subAgentSettings,
     currentProviderId, currentModel, currentProvider, mergedProviders,
-    fetchProviders, selectModel, validateAndSelectModel, setPermissionMode, setThemeMode, setReasoningEffort, setMaxToolRounds, fetchConnectionSettings, saveConnectionSettings, cyclePermissionMode, togglePlanMode,
+    fetchProviders, selectModel, validateAndSelectModel, setPermissionMode, setThemeMode, setReasoningEffort, setMaxToolRounds, setVoiceBroadcast, fetchConnectionSettings, saveConnectionSettings, cyclePermissionMode, togglePlanMode,
     toggleGlobalMemory, syncGlobalMemoryFromEngine, setDigitalLifeEnabled, syncDigitalLifeEnabled, fetchCustomPrompt, saveCustomPrompt,
     upsertProvider, deleteProvider, activateProvider, copyProvider, revealProviderKey, discoverModels, fetchSubAgentSettings, saveSubAgentSettings,
   }

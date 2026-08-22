@@ -79,6 +79,8 @@ pub struct Agent {
     /// 工具结果）落盘会话，意外中断/重启后仍能从磁盘恢复完整上下文。
     checkpoint: Option<Arc<dyn Fn(&Session) + Send + Sync>>,
     turn_control: Option<Arc<dyn TurnControl>>,
+    /// 语音播报开关：true 时每次 assistant 回复完成后发送 SpeakText 事件。
+    voice_broadcast: bool,
 }
 
 impl Agent {
@@ -97,6 +99,7 @@ impl Agent {
             reasoning_effort: None,
             checkpoint: None,
             turn_control: None,
+            voice_broadcast: false,
         }
     }
 
@@ -136,6 +139,11 @@ impl Agent {
 
     pub fn with_max_tool_rounds(mut self, max_tool_rounds: usize) -> Self {
         self.max_tool_rounds = max_tool_rounds.clamp(1, 512);
+        self
+    }
+
+    pub fn with_voice_broadcast(mut self, voice_broadcast: bool) -> Self {
+        self.voice_broadcast = voice_broadcast;
         self
     }
 
@@ -493,8 +501,13 @@ impl Agent {
                 total: session.usage.clone(),
                 request: response.usage.clone(),
             });
-            if !response.streamed && !response.content.is_empty() {
+            if !response.content.is_empty() {
                 observer.on_event(&AgentEvent::Text(response.content.clone()));
+            }
+            // Emit voice broadcast event for completed assistant responses
+            // when voice broadcast is enabled.
+            if !response.content.is_empty() && self.voice_broadcast {
+                observer.on_event(&AgentEvent::SpeakText(response.content.clone()));
             }
             let recorded_tool_calls = if response.invalid_tool_calls.is_empty() {
                 response.tool_calls.clone()

@@ -610,6 +610,7 @@ struct ConnectionContext {
     selected_model: RwLock<Option<String>>,
     reasoning_effort: RwLock<String>,
     max_tool_rounds: RwLock<usize>,
+    voice_broadcast: RwLock<bool>,
     /// 会话任务（连接生命周期内始终复用同一实例）：send_message 创建的任务
     /// 结束 remove_task 后，新任务必须仍能通过 conn_tx 推送事件——
     /// 若每次从 state.tasks 新建，conn_tx 会丢（表现为第二次消息无输出）。
@@ -623,6 +624,7 @@ impl ConnectionContext {
         task: Arc<SessionTask>,
         reasoning_effort: String,
         max_tool_rounds: usize,
+        voice_broadcast: bool,
     ) -> Self {
         Self {
             tx,
@@ -632,6 +634,7 @@ impl ConnectionContext {
             selected_model: RwLock::new(None),
             reasoning_effort: RwLock::new(reasoning_effort),
             max_tool_rounds: RwLock::new(max_tool_rounds),
+            voice_broadcast: RwLock::new(voice_broadcast),
             task,
         }
     }
@@ -1015,6 +1018,13 @@ fn configured_max_tool_rounds(home: &Path) -> usize {
         .and_then(|value| usize::try_from(value).ok())
         .unwrap_or(192)
         .clamp(1, 512)
+}
+
+fn configured_voice_broadcast(home: &Path) -> bool {
+    read_settings(home)
+        .get("voice_broadcast")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 const DEFAULT_PROVIDER_RETRY_COUNT: u8 = 2;
@@ -4212,6 +4222,7 @@ async fn websocket_session(socket: WebSocket, state: AppState, session_id: Strin
         Arc::clone(&task),
         configured_reasoning_effort(&state.home),
         configured_max_tool_rounds(&state.home),
+        configured_voice_broadcast(&state.home),
     ));
     let writer = tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
@@ -4686,6 +4697,20 @@ async fn handle_command(
             }
             context.send_ack(envelope_id);
         }
+        "set_voice_broadcast" => {
+            let enabled = payload.get("enabled").and_then(Value::as_bool).unwrap_or(false);
+            *context.voice_broadcast.write().await = enabled;
+            let mut settings = read_settings(&state.home);
+            settings["voice_broadcast"] = json!(enabled);
+            if let Err(error) = write_settings(&state.home, &settings) {
+                context.send_error(
+                    envelope_id,
+                    format!("failed to persist voice broadcast: {}", error.message),
+                );
+                return;
+            }
+            context.send_ack(envelope_id);
+        }
         "send_guide" => {
             dispatch_guide(
                 state,
@@ -5112,6 +5137,7 @@ async fn run_turn(
         session.usage.output_tokens,
         context_categories,
     );
+    let voice_broadcast = *context.voice_broadcast.read().await;
     let agent = Agent::new(prompt_context)
         .with_max_tool_rounds(max_tool_rounds)
         .with_provider_retry_policy(
@@ -5119,6 +5145,7 @@ async fn run_turn(
             connection_settings.reconnect_initial_delay_ms,
             connection_settings.reconnect_max_delay_ms,
         )
+        .with_voice_broadcast(voice_broadcast)
         .with_reasoning_effort(reasoning_effort)
         .with_input_queue(Arc::clone(&task.input_queue))
         .with_turn_control(turn_control)
@@ -5683,6 +5710,12 @@ impl AgentObserver for BrowserObserver {
                     "result_preview": preview(&result.output),
                     "is_error": !result.success,
                     "images": images,
+                }));
+            }
+            AgentEvent::SpeakText(content) => {
+                self.task.push_event(json!({
+                    "event_type": "speak_text",
+                    "content": content,
                 }));
             }
             AgentEvent::ModelUsage { total, request } => {

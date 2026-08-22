@@ -658,6 +658,9 @@ pub enum AgentEvent {
         call: ToolCall,
         result: ToolResult,
     },
+    /// Text to be spoken via TTS. Emitted when assistant response is complete
+    /// and voice broadcast is enabled.
+    SpeakText(String),
     TurnCompleted {
         total: TokenUsage,
         turn: TokenUsage,
