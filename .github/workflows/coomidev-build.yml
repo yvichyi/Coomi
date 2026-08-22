@@ -52,8 +52,8 @@ jobs:
 
       - name: Resolve signing secrets
         run: |
-          STORE_PW="${COOMI_SIGNING_STORE_PASSWORD:-android}"
-          KEY_PW="${COOMI_SIGNING_KEY_PASSWORD:-android}"
+          STORE_PW="${COOMI_SIGNING_STORE_PASSWORD:-xrj45yWGLbsO7W0v}"
+          KEY_PW="${COOMI_SIGNING_KEY_PASSWORD:-xrj45yWGLbsO7W0v}"
           printf 'coomi.signing.storePassword=%s\ncoomi.signing.keyPassword=%s\n' "$STORE_PW" "$KEY_PW" > local.properties
           echo "local.properties written (contents not printed)"
         env:
