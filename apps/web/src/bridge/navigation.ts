@@ -31,6 +31,7 @@ export function installSystemBackHandler(router: Router): void {
       || route === '/memory'
       || route === '/runtime'
       || route === '/custom-iteration'
+      || route === '/schedules'
       || route === '/files'
       || route === '/catalog'
       || route === '/providers'

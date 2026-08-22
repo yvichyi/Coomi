@@ -111,6 +111,10 @@ function openDashboard() {
         <span>任务中心</span>
         <span v-if="sessions.runningIds.size" class="task-count">{{ sessions.runningIds.size }}</span>
       </button>
+      <button class="taskrow" @click="go('/schedules')">
+        <CoomiIcon name="clock" :size="17" />
+        <span>定时任务</span>
+      </button>
       <button class="taskrow" @click="go('/stats')">
         <CoomiIcon name="barChart" :size="17" />
         <span>使用统计</span>

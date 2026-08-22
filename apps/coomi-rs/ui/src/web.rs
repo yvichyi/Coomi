@@ -69,6 +69,11 @@ use coomi_services::TaskPriority;
 use coomi_services::TaskStatus;
 use coomi_services::generate_cognitive_token;
 use coomi_services::list_installed_skills;
+use crate::scheduler::next_due;
+use crate::scheduler::now_string;
+use crate::scheduler::ScheduleEntry;
+use crate::scheduler::ScheduleRun;
+use crate::scheduler::Scheduler;
 use coomi_telemetry::Telemetry;
 use coomi_tools::AgentScheduler;
 use coomi_tools::ConfiguredSubAgent;
@@ -135,6 +140,8 @@ struct AppState {
     /// keeping Android memory use bounded.
     task_slots: Arc<Semaphore>,
     task_manager: Arc<TaskManager>,
+    /// 定时任务调度器（cron 风格分/时，引擎后台扫描触发）。
+    scheduler: Arc<Scheduler>,
     /// 图片发送已降级的会话：请求因图片被上游拒绝后置位，
     /// 该会话后续请求不再重放历史图片，避免「一张图报错→整会话报废」。
     vision_degraded: Arc<StdMutex<HashSet<String>>>,
@@ -662,6 +669,261 @@ impl ConnectionContext {
     }
 }
 
+/// 后台调度循环：每 30 秒扫描一次，到点触发一次定时任务执行。
+/// 触发的是无 WS 连接的「无人值守」轮：事件缓存在 SessionTask 队列，
+/// 结果写进 schedule runs（前端轮询 /api/schedules 后推送通知）。
+fn spawn_scheduler_background(state: AppState) {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(30));
+        tick.tick().await; // 跳过立即触发
+        loop {
+            tick.tick().await;
+            let now = chrono::Local::now();
+            let due = next_due(&state.scheduler, now).await;
+            let Some(entry) = due else { continue };
+            let started = now_string();
+            let schedule_id = entry.id.clone();
+            let run_id = format!("run-{}", uuid::Uuid::new_v4());
+            // 先写「已触发」记录；执行结束后更新为 completed/failed。
+            {
+                let mut store = state.scheduler.store.lock().await;
+                store.record_run(ScheduleRun {
+                    id: run_id.clone(),
+                    schedule_id: schedule_id.clone(),
+                    started_at: started.clone(),
+                    finished_at: started.clone(),
+                    status: "running".into(),
+                    summary: "已触发，正在执行".into(),
+                });
+                if let Err(error) = store.save(&state.home) {
+                    eprintln!("[scheduler] failed to persist run start: {error:#}");
+                }
+            }
+            eprintln!("[scheduler] trigger {} cron={} prompt={:?}", entry.id, entry.cron, &entry.prompt);
+            let run_state = state.clone();
+            let run_schedule_id = schedule_id.clone();
+            let run_entry = entry.clone();
+            tokio::spawn(async move {
+                let result = run_scheduled_turn(&run_state, &run_schedule_id, &run_entry).await;
+                let (status, summary) = match &result {
+                    Ok(summary) => ("completed", summary.clone()),
+                    Err(error) => ("failed", format!("{error:#}")),
+                };
+                let finished = now_string();
+                let mut store = run_state.scheduler.store.lock().await;
+                if let Some(run) = store.runs.iter_mut().find(|r| r.id == run_id) {
+                    run.status = status.into();
+                    run.summary = summary.clone();
+                    run.finished_at = finished.clone();
+                }
+                if let Err(error) = store.save(&run_state.home) {
+                    eprintln!("[scheduler] failed to persist run result: {error:#}");
+                }
+                eprintln!("[scheduler] run {run_id} {status}: {summary}");
+            });
+        }
+    });
+}
+
+/// 无 WS 连接的定时任务执行：复用 run_turn 的完整 Agent 管线，
+/// 但用合成 ConnectionContext（事件不推 WS，只进 SessionTask 排队）。
+/// 返回执行摘要（agent 最后一段正文，截断到 500 字符）。
+async fn run_scheduled_turn(
+    state: &AppState,
+    _schedule_id: &str,
+    entry: &ScheduleEntry,
+) -> Result<String> {
+    let session_id = format!("sched-{}", entry.id);
+    let task = state.task(&session_id);
+    if task.running.swap(true, Ordering::SeqCst) {
+        anyhow::bail!("scheduled task already running for {}", entry.id);
+    }
+    if let Err(error) = begin_managed_task(state, &session_id, task.as_ref(), "scheduled") {
+        task.running.store(false, Ordering::SeqCst);
+        anyhow::bail!("failed to create scheduled task: {error:#}");
+    }
+    persist_task_checkpoints(state);
+    // 合成无连接 context：无人消费的 channel 事件用一个丢弃任务收走，
+    // 避免 send_event 在 unbounded channel 里无限堆积。
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    tokio::spawn(async move { while rx.recv().await.is_some() {} });
+    let context = Arc::new(ConnectionContext::new(
+        tx.clone(),
+        Arc::clone(&state.permission),
+        Arc::clone(&task),
+        configured_reasoning_effort(&state.home),
+        configured_max_tool_rounds(&state.home),
+        configured_voice_broadcast(&state.home),
+    ));
+    *context.session_mode.write().await = SessionMode::Agent;
+    let result = run_turn(
+        state,
+        &session_id,
+        entry.prompt.as_str(),
+        false,
+        Arc::clone(&context),
+        Arc::clone(&task),
+    )
+    .await;
+    let result = result.map(|()| summarize_scheduled_output(task.as_ref()));
+    task.finish(if result.is_ok() { "completed" } else { "failed" });
+    persist_task_checkpoints(state);
+    task.abort
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take();
+    result
+}
+
+/// 从 task 事件队列里捞最后的 assistant 文本作为摘要。
+fn summarize_scheduled_output(task: &SessionTask) -> String {
+    let queue = task
+        .unacked_events
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut texts = Vec::new();
+    for event in queue.iter().rev() {
+        if event.get("event_type").and_then(Value::as_str) == Some("text_chunk") {
+            if let Some(text) = event.get("content").and_then(Value::as_str) {
+                texts.push(text);
+                if texts.len() >= 3 {
+                    break;
+                }
+            }
+        }
+    }
+    drop(queue);
+    let summary = texts.iter().rev().cloned().collect::<Vec<_>>().join("\n");
+    let mut summary = summary.trim().to_string();
+    if summary.chars().count() > 500 {
+        summary = summary.chars().take(500).collect::<String>();
+        summary.push('…');
+    }
+    if summary.is_empty() {
+        "任务执行完成（无文本输出）".into()
+    } else {
+        summary
+    }
+}
+
+// ── REST handlers ──────────────────────────────────────────────
+
+#[derive(Default, Deserialize)]
+struct SchedulePayload {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    cron: String,
+    #[serde(default)]
+    prompt: String,
+    #[serde(default)]
+    notify: Option<bool>,
+    #[serde(default)]
+    enabled: Option<bool>,
+}
+
+fn validate_schedule_entry(entry: &ScheduleEntry) -> Result<(), ApiError> {
+    let parts: Vec<&str> = entry.cron.split_whitespace().collect();
+    if parts.len() != 2 {
+        return Err(ApiError::bad_request(
+            "cron must be two fields: minute hour (e.g. \"30 8\")",
+        ));
+    }
+    for (i, part) in parts.iter().enumerate() {
+        if *part == "*" {
+            continue;
+        }
+        let parsed = part.parse::<u32>().map_err(|_| {
+            ApiError::bad_request(format!(
+                "cron field {} must be * or a number: {}",
+                i + 1,
+                part
+            ))
+        })?;
+        if i == 0 && parsed > 59 {
+            return Err(ApiError::bad_request("minute must be 0-59"));
+        }
+        if i == 1 && parsed > 23 {
+            return Err(ApiError::bad_request("hour must be 0-23"));
+        }
+    }
+    if entry.prompt.trim().is_empty() {
+        return Err(ApiError::bad_request("prompt must not be empty"));
+    }
+    Ok(())
+}
+
+async fn list_schedules(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let store = state.scheduler.store.lock().await;
+    Ok(Json(json!({
+        "schedules": store.schedules,
+        "runs": store.runs.iter().rev().take(50).collect::<Vec<_>>(),
+    })))
+}
+
+async fn upsert_schedule(
+    State(state): State<AppState>,
+    Json(body): Json<SchedulePayload>,
+) -> Result<Json<Value>, ApiError> {
+    let id = if body.id.is_empty() {
+        format!("sched-{}", uuid::Uuid::new_v4())
+    } else {
+        body.id.clone()
+    };
+    let entry = ScheduleEntry {
+        id: id.clone(),
+        cron: body.cron.trim().to_string(),
+        prompt: body.prompt.trim().to_string(),
+        notify: body.notify.unwrap_or(true),
+        enabled: body.enabled.unwrap_or(true),
+        created_at: now_string(),
+    };
+    validate_schedule_entry(&entry)?;
+    let mut store = state.scheduler.store.lock().await;
+    store.upsert(entry);
+    store
+        .save(&state.home)
+        .map_err(|e| ApiError::internal(format!("failed to save schedule: {e:#}")))?;
+    Ok(Json(json!({"ok": true, "id": id})))
+}
+
+async fn remove_schedule(
+    State(state): State<AppState>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<Value>, ApiError> {
+    let mut store = state.scheduler.store.lock().await;
+    let removed = store.remove(&id);
+    store
+        .save(&state.home)
+        .map_err(|e| ApiError::internal(format!("failed to save schedule: {e:#}")))?;
+    Ok(Json(json!({"ok": removed})))
+}
+
+async fn run_schedule_now(
+    State(state): State<AppState>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<Value>, ApiError> {
+    let entry = state
+        .scheduler
+        .store
+        .lock()
+        .await
+        .schedules
+        .iter()
+        .find(|s| s.id == id)
+        .cloned()
+        .ok_or_else(|| ApiError::not_found("schedule not found"))?;
+    let state2 = state.clone();
+    tokio::spawn(async move {
+        let result = run_scheduled_turn(&state2, &entry.id, &entry).await;
+        match result {
+            Ok(summary) => eprintln!("[scheduler] manual run {} completed: {}", entry.id, summary),
+            Err(error) => eprintln!("[scheduler] manual run {} failed: {error:#}", entry.id),
+        }
+    });
+    Ok(Json(json!({"ok": true, "id": id})))
+}
+
 pub async fn serve(
     home: PathBuf,
     cwd: PathBuf,
@@ -710,19 +972,22 @@ pub async fn serve(
     let task_manager = Arc::new(TaskManager::open(&home)?);
     let restored_tasks = load_task_checkpoints(&home, &task_manager);
     let configured_task_limit = configured_connection_settings(&home).max_concurrent_tasks;
+    let scheduler = Scheduler::new(&home);
     let state = AppState {
-        home,
-        cwd,
+        home: home.clone(),
+        cwd: cwd.clone(),
         port,
         token,
         permission,
         tasks: Arc::new(StdMutex::new(restored_tasks)),
         task_slots: Arc::new(Semaphore::new(configured_task_limit)),
         task_manager,
+        scheduler,
         vision_degraded: Arc::new(StdMutex::new(HashSet::new())),
         registry_cache: Arc::new(StdMutex::new(registry_cache)),
     };
     refresh_registry_cache_background(state.clone());
+    spawn_scheduler_background(state.clone());
     // 引擎启动时补发上次会话遗留的未上报事件（如进程被系统杀掉前没来得及 flush）。
     Telemetry::new(&state.home).flush_background();
     let index = static_dir.join("index.html");
@@ -764,6 +1029,14 @@ pub async fn serve(
         .route(
             "/api/providers/{id}/discover-models",
             post(discover_provider_models),
+        )
+        .route(
+            "/api/schedules",
+            get(list_schedules).post(upsert_schedule),
+        )
+        .route(
+            "/api/schedules/{id}",
+            delete(remove_schedule).post(run_schedule_now),
         )
         .route("/api/sessions", get(list_sessions))
         .route("/api/tasks", get(list_tasks))

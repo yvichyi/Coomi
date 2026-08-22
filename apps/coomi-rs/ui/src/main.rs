@@ -35,6 +35,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
+mod scheduler;
 mod terminal_ui;
 mod web;
 
