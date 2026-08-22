@@ -47,7 +47,7 @@ function fmt(n: number): string {
 
 <template>
   <div class="page">
-    <PageHead title="使用统计" @back="goBack(router)" />
+    <PageHead title="使用统计" @back="goBack(router, '/')" />
     <main class="body">
       <div v-if="loading" class="empty">加载中…</div>
       <template v-else>
