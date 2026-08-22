@@ -785,7 +785,7 @@ fn summarize_scheduled_output(task: &SessionTask) -> String {
     for event in queue.iter().rev() {
         if event.get("event_type").and_then(Value::as_str) == Some("text_chunk") {
             if let Some(text) = event.get("content").and_then(Value::as_str) {
-                texts.push(text);
+                texts.push(text.to_owned());
                 if texts.len() >= 3 {
                     break;
                 }
