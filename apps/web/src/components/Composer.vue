@@ -48,18 +48,18 @@ function toggleDictation() {
   if (!window.CoomiAndroid?.isSttAvailable?.()) return
   isListening.value = true
   sttCallbackId = 'stt_' + Date.now()
-  window.__coomiSttResult = (cb, text) => {
+  ;(window as any).__coomiSttResult = (cb: string, txt: string) => {
     if (cb !== sttCallbackId) return
-    text.value = (text.value + ' ').trimEnd() + text
+    text.value = (text.value + ' ').trimEnd() + txt
     isListening.value = false
     autoGrow()
   }
-  window.__coomiSttPartial = (cb, text) => {
+  ;(window as any).__coomiSttPartial = (cb: string, txt: string) => {
     if (cb !== sttCallbackId) return
-    text.value = text
+    text.value = txt
     autoGrow()
   }
-  window.__coomiSttError = (cb, error) => {
+  ;(window as any).__coomiSttError = (cb: string, _err: string) => {
     if (cb !== sttCallbackId) return
     isListening.value = false
   }

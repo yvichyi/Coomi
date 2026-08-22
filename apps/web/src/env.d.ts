@@ -3,6 +3,9 @@
 interface Window {
   __coomiHandleSystemBack?: () => boolean
   __coomiApplyAppearance?: (config: AppearanceConfig) => void
+  __coomiSttResult?: (cb: string, text: string) => void
+  __coomiSttPartial?: (cb: string, text: string) => void
+  __coomiSttError?: (cb: string, error: string) => void
   CoomiAndroid?: {
     openDashboard(): void
     importFiles?(): void
@@ -24,6 +27,30 @@ interface Window {
     getDigitalLifeEnabled?(): boolean
     setDigitalLifeEnabled?(enabled: boolean): void
     getAppearanceConfig?(): string
+    notify?(title: string, body: string): void
+    getClipboard?(): string
+    setClipboard?(text: string): void
+    isSttAvailable?(): boolean
+    startDictation?(callbackId: string): void
+    stopDictation?(): void
+    getVoices?(): string
+    setVoice?(voiceName: string): boolean
+    getSpeechRate?(): number
+    setSpeechRate?(rate: number): void
+    speakText?(text: string): void
+    stopSpeaking?(): void
+    setVoiceBroadcast?(enabled: boolean): void
+    speakText?(text: string): void
+    stopDictation?(): void
+    startDictation?(callbackId: string): void
+    isSttAvailable?(): boolean
+    getVoices?(): string
+    setVoice?(voiceName: string): boolean
+    getSpeechRate?(): number
+    setSpeechRate?(rate: number): void
+    notify?(title: string, body: string): void
+    getClipboard?(): string
+    setClipboard?(text: string): void
   }
 }
 

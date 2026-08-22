@@ -53,14 +53,20 @@ function initBgCanvas() {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight }
+  const cvs = canvas
+  const resize = () => {
+    cvs.width = cvs.offsetWidth
+    cvs.height = cvs.offsetHeight
+  }
   resize()
   const particles: { x: number; y: number; vx: number; vy: number; r: number; o: number }[] = []
-  const COUNT = Math.min(50, Math.floor(canvas.width * canvas.height / 12000))
+  const w = cvs.width
+  const h = cvs.height
+  const COUNT = Math.min(50, Math.floor(w * h / 12000))
   for (let i = 0; i < COUNT; i++) {
     particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
+      x: Math.random() * w,
+      y: Math.random() * h,
       vx: (Math.random() - 0.5) * 0.4,
       vy: (Math.random() - 0.5) * 0.4,
       r: Math.random() * 2 + 1,
@@ -68,14 +74,14 @@ function initBgCanvas() {
     })
   }
   function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.clearRect(0, 0, cvs.width, cvs.height)
     for (const p of particles) {
       p.x += p.vx; p.y += p.vy
-      if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-      if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+      if (p.x < 0 || p.x > cvs.width) p.vx *= -1
+      if (p.y < 0 || p.y > cvs.height) p.vy *= -1
       ctx.beginPath()
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(150,180,220,${p.o})`
+      ctx.fillStyle = 'rgba(150,180,220,' + p.o + ')'
       ctx.fill()
     }
     bgAnimId = requestAnimationFrame(draw)

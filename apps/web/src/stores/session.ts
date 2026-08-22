@@ -169,7 +169,7 @@ export const useSessionStore = defineStore('session', () => {
   function applyEvent(ev: AgentEvent) {
     switch (ev.event_type) {
       case 'speak_text':
-        if (config.voiceBroadcast.value && window.CoomiAndroid?.speakText) {
+        if (config.voiceBroadcast && window.CoomiAndroid?.speakText) {
           window.CoomiAndroid.speakText(ev.content)
         }
         break
@@ -380,9 +380,6 @@ export const useSessionStore = defineStore('session', () => {
   function setVoiceBroadcast(enabled: boolean) {
     config.setVoiceBroadcast(enabled)
     transport.value?.send({ command: 'set_voice_broadcast', enabled })
-    if (window.CoomiAndroid?.setVoiceBroadcast) {
-      window.CoomiAndroid.setVoiceBroadcast(enabled)
-    }
   }
 
   function cancelRunningTools() {
@@ -417,14 +414,13 @@ export const useSessionStore = defineStore('session', () => {
     transport.value?.send({ command: 'send_message', text: trimmed })
     persistSoon()
     // ASCII art easter egg
-    void detectAsciiArt(trimmed).then(art => {
-      if (art) {
-        setTimeout(() => {
-          timeline.value.push({ kind: 'assistant', id: nextId(), content: '```\n' + art + '\n```', streaming: false })
-          persistSoon()
-        }, 600 + Math.random() * 600)
-      }
-    })
+    const art = detectAsciiArt(trimmed)
+    if (art) {
+      setTimeout(() => {
+        timeline.value.push({ kind: 'assistant', id: nextId(), content: '```\n' + art + '\n```', streaming: false })
+        persistSoon()
+      }, 600 + Math.random() * 600)
+    }
   }
 
   function cancel() { transport.value?.send({ command: 'cancel' }) }
